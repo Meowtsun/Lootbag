@@ -1,0 +1,10 @@
+[package]
+name = "meowtsun/lootbag"
+description = "LootTable generator for Roblox, with built-in luck system"
+version = "1.0"
+license = "MIT"
+authors = ["Meowtsun <Meowtsun@gmail.com>"]
+registry = "https://github.com/UpliftGames/wally-index"
+realm = "shared"
+
+[dependencies]
