@@ -1,0 +1,6 @@
+{
+	"name": "lootbag",
+	"tree": {
+		"$path": "src"
+	}
+}
