@@ -1,0 +1,8 @@
+[package]
+name = "Lootbag"
+version = "1.0"
+license = "MIT"
+authors = ["Meowtsun <Meowtsun@gmail.com>"]
+content_root = "src"
+
+[dependencies]
