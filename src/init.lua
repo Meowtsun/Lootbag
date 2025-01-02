@@ -209,9 +209,6 @@ function Lootbag:GetItem(luck, retries)
 			local item = self.Items[index]
 			upperbound += item.Weight
 			
-			print(value <= upperbound, ';', value, upperbound)
-			-- print delay it for a sec and now it just works 
-			
 			if value <= upperbound and item.Weight < best_score then
 				best_score, best_item, entry = item.Weight, item.Item, index
 				break
