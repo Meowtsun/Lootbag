@@ -1,4 +1,104 @@
 
+--[[
+	
+	Lootbag:
+		- LootTable generator for Roblox with built-in luck system
+	
+	
+	Quick Start:
+		local Lootbag = require(...)
+		local rarity = Lootbag.new('Rarity')
+		local server_luck = 3
+		
+		rarity:AddItem('Common', 1/4)
+		rarity:AddItem('Unommon', 1/8)
+		rarity:AddItem('Rare', 1/16)
+		
+		local result = rarity:GetItem(server_luck)
+		print(result)
+		
+		-- testing result with and without luck (check output)
+		rarity:Sample(100, server_luck)
+		rarity:Sample(100)
+
+
+	API:
+		Lootbag.new() -> Lootbag
+			- create and return Lootbag object
+		
+		
+		Lootbag:AddItem(item, weight, label) -> nil
+			- add item to Lootbag, You can add [label] to item if you need to remove them later
+		
+		
+		Lootbag:RemoveItem(label)
+			- remove item inside Lootbag using [label] previously added
+
+
+		Lootbag:RemoveIf(predicate)
+			- remove item using given function, remove Item if said function return true
+			
+				lootbag:AddItem(Instance.new('Part'), 1/2)
+				lootbag:RemoveIf(function(item)
+					if item.Name == 'Part' then
+						return true -- removing it
+					end
+				end)
+				
+			
+		Lootbag:GetItem(luck, retries)
+			- get Item from Lootbag relative to luck and retries, return Item and weight of said Item
+			
+			
+		Lootbag:GetItems(count, luck, retries)
+			- get multiple Items from Lootbag relative to luck and retries, return a table
+			
+				table: {
+					{
+						Weight: number,
+						Value: number,
+						Item: any,
+					},
+					...
+				}
+				
+			
+		Lootbag:Sample(count, luck, retries)
+			- get multiple Items from Lootbag relative to luck and retries, print result in output and return table
+			
+				table: {
+					{
+						Weight: number,
+						Value: number,
+						Item: any,
+					},
+					...
+				}
+				
+				
+		Lootbag:ListItems(usePercentage)
+			- return table containing all Items, optionally accept boolean to replace weight with percentage
+			
+				table: {
+					{
+						Weight: number,
+						Value: number,
+						Item: any,
+					},
+					...
+				}
+			
+			
+			
+	Licence: MIT licence
+
+
+	Authors:
+		Huonzales - Sep 8th, 2024
+		
+]]
+
+
 local Lootbag = { Name = 'Lootbag', Factor = 1.2 }
 local Module = {}
 Module.__index = Lootbag
@@ -26,7 +126,7 @@ local function nameFormat(item)
 end
 
 
--- return Lootbag object
+-- create and return Lootbag object
 function Module.new(name)
 	return setmetatable({
 		Name = name,
@@ -34,7 +134,7 @@ function Module.new(name)
 		Weight = 0,
 		Items = {
 		--[[
-			Item<nil>,
+			Item,
 			...
 		]]
 		},
@@ -42,7 +142,7 @@ function Module.new(name)
 end
 
 
--- add item to Lootbag, You can add [label] to item for ease of access later
+-- add item to Lootbag, You can add [label] to item if you need to remove them later
 function Lootbag:AddItem(item, weight, label)
 	local total = #self.Items
 	
