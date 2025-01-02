@@ -23,8 +23,8 @@
 
 
 	API:
-		Lootbag.new() -> Lootbag
-			- create and return Lootbag object
+		Lootbag.new(name) -> Lootbag
+			- create and return Lootbag object, optionally accept Name here
 		
 		
 		Lootbag:AddItem(item, weight, label) -> nil
