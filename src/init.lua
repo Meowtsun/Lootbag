@@ -1,104 +1,58 @@
 
---[[
-	
-	Lootbag:
-		- LootTable generator for Roblox, with built-in luck system
-		   
-		   
-	API:
-		Lootbag.new() -> Lootbag
-			- create and return lootbag object
-			
-		Lootbag:AddItem(item, weight) -> nil,
-			- add item to lootbag
-			
-		Lootbag:GetItem(luck, retries)	 -> any, number
-			- get one item from lootbag relative to luck and retries, returns item and weight
-			
-		Lootbag:GetItems(count, luck, retries) -> Items
-			- perform multiple GetItem() then return Items table as result
-			
-			Items: {
-				[item]: {
-					Weight: number,
-					Value: number,
-				},
-				...
-			}
-		
-		Lootbag:Sample(count, luck, retries, format) -> nil
-			- sample by getting {count} items from lootbag using provided luck and retries then printing entire result in output
-			additionally accept format to format how item would be display in string
-		
-			format: (item) -> string
-		
-		Lootbag:ListItems(usePercentage) -> {[item]: number}
-			- returns table that has items as key and weight or percentage as value, return weight by default 
-		
-		Lootbag:SetItem(item, weight) -> nil
-			- similar to AddItem but would overwrite the same exact item in lootbag
-			
-		Lootbag:RemoveItem(item, weight) -> nil
-			- remove the same exact item in lootbag
-			
-		Lootbag:RemoveIf(predicate) -> nil
-			- remove item if predicate(item) return true
-			
-			predicate: (item) -> boolean
-		
-	Licence: MIT licence
+local Lootbag = { Name = 'Lootbag', Factor = 1.2 }
+local Module = {}
+Module.__index = Lootbag
 
-	Authors:
-		Huonzales - Sep 8th, 2024
-]]
-
-local WeightAdjustment = 1e9
-local Lootbag = {}
-Lootbag.__index = Lootbag
+-- I assumed nobody would want to edit this on run-time?
+local lowestBound = 1e-3
+local weightAdjustment = 1e9
 
 
-local function random(max, factor, luck)
-	return math.max(0.001, max - math.floor(max * math.random() ^ (factor / luck)))
+local function rollnumber(max, factor, luck)
+	return math.max(
+		lowestBound, max - math.floor(max * math.random() ^ (factor / luck))
+	)
 end
 
-local function weightSort(a, b)
+
+local function weightedSort(a, b)
 	return a.Weight > b.Weight
 end
 
-local function emptyformat(s)
-	return s
+
+local function nameFormat(item)
+	return item.Label
+		or tostring(item.Item)
 end
 
 
-
-function Lootbag.new()
+-- return Lootbag object
+function Module.new(name)
 	return setmetatable({
-		Factor = 1.2,
+		Name = name,
+		Factor = nil,
 		Weight = 0,
 		Items = {
-			--[[
-				{
-					Weight: number,
-					Item: any,
-				},
-				...
-			]]
-		}
-	}, Lootbag)
+		--[[
+			Item<nil>,
+			...
+		]]
+		},
+	}, Module)
 end
 
 
-
-function Lootbag:AddItem(item, weight)
+-- add item to Lootbag, You can add [label] to item for ease of access later
+function Lootbag:AddItem(item, weight, label)
 	local total = #self.Items
 	
-	local weight = weight * WeightAdjustment
+	local weight = weight * weightAdjustment
 	local position = math.max(1, total + 1)
 	
 	if total > 0 then
 		for index = total, 1, -1 do
-			local loot = self.Items[index] -- Hello c:
-			if loot.Weight <= weight then
+			local item = self.Items[index]
+			if item.Weight <= weight then
 				position = index
 			else
 				break
@@ -107,43 +61,80 @@ function Lootbag:AddItem(item, weight)
 	end
 	
 	table.insert(self.Items, position, {
-		Item = item,
 		Weight = weight,
+		Item = item,
+		Label = label,
 	})
 	
 	self.Weight += weight
 end
 
 
+-- remove item inside Lootbag using [label] previously added
+function Lootbag:RemoveItem(label)
+	for index = #self.Items, 1, -1 do
+		local item = self.Items[index]
+		if item.Label == label then
+			self.Weight -= item.Weight
+			table.remove(self.Items, index)
+		end
+	end
+end
 
+
+-- remove item using given function, remove Item if said function return true
+function Lootbag:RemoveIf(predicate)
+	for index = #self.Items, 1, -1 do
+		local item = self.Items[index]
+		if predicate(item.Item) == true then
+			self.Weight -= item.Weight
+			table.remove(self.Items, index)
+		end
+	end
+end
+
+
+-- get Item from Lootbag relative to luck and retries, return Item and weight of said Item
 function Lootbag:GetItem(luck, retries)
 	
+	local luck = math.clamp(luck or 1, lowestBound, math.huge)
 	local best_score, best_item, entry = math.huge, nil
-	local luck = math.clamp(luck or 1, 0.01, math.huge)
 	local retries = retries or 1
 	
 	for index = 1, retries do
-		local value = random(self.Weight, self.Factor, luck)
+		local value = rollnumber(self.Weight, self.Factor, luck)
 		local upperbound = 0
 		
 		for index = #self.Items, 1, -1 do
-			local loot = self.Items[index]
-			upperbound += loot.Weight
-			if value <= upperbound and loot.Weight < best_score then
-				best_score, best_item, entry = loot.Weight, loot.Item, index
+			local item = self.Items[index]
+			upperbound += item.Weight
+			
+			print(value <= upperbound, ';', value, upperbound)
+			-- print delay it for a sec and now it just works 
+			
+			if value <= upperbound and item.Weight < best_score then
+				best_score, best_item, entry = item.Weight, item.Item, index
 				break
 			end
 		end
 	end
 	
-	return best_item, best_score / WeightAdjustment, entry
+	if not best_item then
+		local item = self.Items[1]
+		best_score = item.Weight
+		best_item = item.Item
+		entry = 1
+	end
+
+	return best_item, best_score / weightAdjustment, entry
 end
 
 
-
+-- get multiple Items from Lootbag relative to luck and retries, return a table
 function Lootbag:GetItems(count, luck, retries)
 	
-	local results = {
+	local result = {}
+	local temp = {
 		--[[
 			[item]: {
 				Weight: number,
@@ -154,126 +145,102 @@ function Lootbag:GetItems(count, luck, retries)
 	}
 	
 	for index = 1, count or 1 do
-		local item, weight = self:GetItem(luck, retries)
-		
-		if results[item] then
-			results[item].Value += 1
+		local item, weight = self:	GetItem(luck, retries)
+		if temp[item] then
+			temp[item].Value += 1
 			continue
 		end
 		
-		results[item] = {
+		temp[item] = {
 			Weight = weight,
 			Value = 1
 		}
-		
 	end
 	
-	return results
+	for item, info in temp do
+		table.insert(result, {
+			Weight = info.Weight,
+			Value = info.Value,
+			Item = item,
+		})
+	end
+	
+	table.sort(result, weightedSort)
+	table.clear(temp)
+
+	return result
 end
 
 
-
-function Lootbag:Sample(count, luck, retries, format)
-	local tests = {}
-
-	local luck = math.clamp(luck or 1, 0.01, math.huge)
-	local format = format or emptyformat
-	local retries = retries or 1
-
-	for index ,loot in self.Items do
-		tests[index] = table.clone(loot)
-		tests[index].Count = 0
+-- get multiple Items from Lootbag relative to luck and retries, print result in output and return table
+function Lootbag:Sample(count, luck, retries)
+	local result = {}
+	
+	for index, item in self.Items do
+		local copy = table.clone(item)
+		copy.Value = 0
+		result[index] = copy
 	end
-
+	
 	for index = 1, count do
-		local item, chance, entry = self:GetItem(luck, retries)
-		tests[entry].Count += 1
+		local item, weight, entry = self:GetItem(luck, retries)
+		result[entry].Value += 1
 	end
-
-	table.sort(tests, weightSort)
-
-	local message = `[Lootbag]: {count} Samples (Luck:{luck}, Retries:{retries - 1}) `
-	for _, loot in next, tests do
-		local estimated_rarity = string.format('%.2f', loot.Weight / self.Weight * 100)
-		local sampled_rarity = string.format('%.2f', loot.Count / count * 100)
-		message ..= '\n	' .. `{format(loot.Item)}: {loot.Count} [{estimated_rarity}% : {sampled_rarity}%]`
+	
+	local log = `[Lootbag]: {count} Samples (Luck:{luck or 0}, Retries:{retries or 0}) `
+	for _, item in result do
+		local estimated_rarity = string.format('%.3f', item.Weight / self.Weight * 100)
+		local sampled_rarity = string.format('%.3f', item.Value / count * 100)
+		log ..= '\n	' .. `{nameFormat(item)}: {item.Value} [{estimated_rarity}% : {sampled_rarity}%]`
 	end
-
-	print(message)
-	return tests
+	
+	print(log)
+	return result
 end
 
 
-
+-- return table containing all Items, optionally accept boolean to replace weight with percentage
 function Lootbag:ListItems(usePercentage)
-	local tests = {}
-
-	for index ,loot in self.Items do
-		tests[index] = table.clone(loot)
-		tests[index].Weight = usePercentage
-			and loot.Weight / self.Weight * 100 
-			or self.Weight
-	end
+	local list = {}
 	
-	return tests
-end
-
-
-
-function Lootbag:SetItem(item, weight)
-	for _, loot in self.Items do
-		if loot.Item == item then
-			loot.Weight = weight
+	for index, item in self.Items do
+		local copy =  table.clone(item)
+		list[index] =copy
+		if usePercentage then
+			copy.Weight = item.Weight / self.Weight * 100
 		end
 	end
 	
-	table.sort(Lootbag, weightSort)
+	return list
 end
 
 
 
-function Lootbag:RemoveItem(item)
-	for index, loot in self.Items do
-		if loot.Item == item then
-			return table.remove(self.Items, index)
-		end
-	end
-end
-
-
-
-function Lootbag:RemoveIf(predicate)
-	for index, loot in self.Items do
-		if predicate(loot.Item) then
-			table.remove(self.Items, index)
-		end
-	end
-end
+export type Item = {
+	Weight: number,
+	Item: any,
+	Label: string,
+	Value: number,
+}
 
 
 export type Lootbag = {
 	
-	Factor: number,
 	Weight: number,
-	Items: {
-		{
-			Weight: number,
-			Item: any,
-		}
-	},
+	Name: string,
+	Factor: number,
+	Items: {Item},
 	
-	AddItem: (self: Lootbag, item: any, weight: number) -> nil,
-	GetItem: (self: Lootbag, luck: number?, retries: number?) -> nil,
-	GetItems: (self: Lootbag, count: number?, luck: number?, retries: number?) -> nil,
-	Sample: (self: Lootbag, count: number?, luck: number?, retries: number?, format: (item: any) -> (boolean?)) -> nil,
-	ListItems: (self: Lootbag, usePercentage: boolean) -> nil,
-	SetItem: (self: Lootbag, item: any, weight: number) -> nil,
-	RemoveItem: (self: Lootbag, item: any) -> nil,
-	RemoveIf: (self: Lootbag, predicate: (item: any) -> (boolean)) -> nil,
+	AddItem: (self: Lootbag, item: any, weight: number, label: string?) -> (),
+	RemoveIf: (self: Lootbag, predicate: (item: any) -> (boolean?))-> (),
+	RemoveItem: (self: Lootbag, label: string) -> (),
+	GetItem: (self: Lootbag, luck: number?, retries: number?) -> (any, number),
+	GetItems: (self: Lootbag, count: number, luck: number?, retries: number?) -> ({Item}),
+	Sample: (self: Lootbag, count: number, luck: number?, retries: number?) -> ({Item}),
+	ListItems: (self:Lootbag, usePercentage: boolean?) -> ({Item}),
 	
 }
 
 
-return Lootbag :: {
-	new: () -> Lootbag
-}
+
+return Module 
